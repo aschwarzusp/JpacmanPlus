@@ -1,0 +1,895 @@
+diff --git a/build.gradle b/build.gradle
+index 538ba22..372c354 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -96,4 +96,9 @@ task staticAnalysis(type: GradleBuild) {
+     ]
+ }
+ 
++task runFeature1(type: JavaExec) {
++    classpath = sourceSets.main.runtimeClasspath
++    main = 'nl.tudelft.jpacman.Feature1Launcher'
++}
++
+ mainClassName = 'nl.tudelft.jpacman.Launcher'
+diff --git a/doc/feature1.md b/doc/feature1.md
+new file mode 100644
+index 0000000..9aa5cb0
+--- /dev/null
++++ b/doc/feature1.md
+@@ -0,0 +1,30 @@
++# Feature 1: Portões e interruptores
++
++## Símbolos do mapa
++
++- `1` e `2`: interruptores dos circuitos 1 e 2.
++- `a` e `b`: portões dos circuitos 1 e 2.
++- `#`, espaço, `.`, `P` e `G` mantêm os significados originais.
++
++Os dois circuitos começam fechados. Cada entrada bem-sucedida do jogador em um
++interruptor alterna somente o circuito correspondente. Fantasmas atravessam os
++interruptores sem acioná-los.
++
++## Portões
++
++Portões abertos permitem entrada e saída. O fechamento de um portão ocupado fica
++pendente: os ocupantes podem sair, novas entradas são bloqueadas e o portão fecha
++quando seu último ocupante sai. Uma ordem de abertura cancela o fechamento pendente.
++A marca `*` identifica o fechamento pendente; o número identifica o circuito.
++
++Mapas sem os novos símbolos continuam válidos. Se um circuito aparecer no mapa,
++ele precisa ter ao menos um portão e um interruptor. Símbolos desconhecidos e
++circuitos incompletos geram `PacmanConfigurationException`.
++
++## Executar
++
++Na raiz do projeto:
++
++```sh
++./gradlew runFeature1
++```
+diff --git a/src/main/java/nl/tudelft/jpacman/Feature1Launcher.java b/src/main/java/nl/tudelft/jpacman/Feature1Launcher.java
+new file mode 100644
+index 0000000..a90de4b
+--- /dev/null
++++ b/src/main/java/nl/tudelft/jpacman/Feature1Launcher.java
+@@ -0,0 +1,15 @@
++package nl.tudelft.jpacman;
++
++
++
++/** Launcher for the Feature 1 demonstration map. */
++public class Feature1Launcher extends Launcher {
++    /**
++     * Starts the Feature 1 demonstration.
++     *
++     * @param args command-line arguments
++     */
++    public static void main(String[] args) {
++        new Feature1Launcher().withMapFile("/feature1.txt").launch();
++    }
++}
+diff --git a/src/main/java/nl/tudelft/jpacman/board/BoardFactory.java b/src/main/java/nl/tudelft/jpacman/board/BoardFactory.java
+index 537cf8d..fa53a8a 100644
+--- a/src/main/java/nl/tudelft/jpacman/board/BoardFactory.java
++++ b/src/main/java/nl/tudelft/jpacman/board/BoardFactory.java
+@@ -75,6 +75,28 @@ public class BoardFactory {
+         return new Wall(sprites.getWallSprite());
+     }
+ 
++    /**
++     * Creates a gate controlled by a circuit.
++     *
++     * @param circuitController the circuit controlling this gate
++     * @return a new gate square
++     */
++    public Square createGate(Circuit circuitController) {
++        return new Gate(circuitController, sprites.getGroundSprite(),
++            sprites.getWallSprite());
++    }
++
++    /**
++     * Creates a switch controlled by a circuit.
++     *
++     * @param circuitController the circuit toggled by this switch
++     * @return a new switch square
++     */
++    public Square createSwitch(Circuit circuitController) {
++        return new Switch(circuitController,
++            sprites.getSwitchSprite(circuitController.getId()));
++    }
++
+     /**
+      * A wall is a square that is inaccessible to anyone.
+      *
+diff --git a/src/main/java/nl/tudelft/jpacman/board/Circuit.java b/src/main/java/nl/tudelft/jpacman/board/Circuit.java
+new file mode 100644
+index 0000000..7b828bb
+--- /dev/null
++++ b/src/main/java/nl/tudelft/jpacman/board/Circuit.java
+@@ -0,0 +1,69 @@
++package nl.tudelft.jpacman.board;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/**
++ * Controls the gates belonging to one independent switch circuit.
++ */
++public class Circuit {
++    private final int id;
++    private final List<Gate> gates = new ArrayList<>();
++    private final List<Switch> switches = new ArrayList<>();
++    private boolean open;
++
++    /**
++     * Creates a new circuit whose gates start closed.
++     *
++     * @param circuitId identifier used by map symbols and visual labels
++     */
++    public Circuit(int circuitId) {
++        this.id = circuitId;
++        this.open = false;
++    }
++
++    /** @return the circuit identifier */
++    public int getId() {
++        return id;
++    }
++
++    /** @return whether the latest circuit command is open */
++    public boolean isOpen() {
++        return open;
++    }
++
++    /** @return whether this circuit occurs in the current map */
++    public boolean isUsed() {
++        return !gates.isEmpty() || !switches.isEmpty();
++    }
++
++    /** @return whether this circuit has at least one gate */
++    public boolean hasGates() {
++        return !gates.isEmpty();
++    }
++
++    /** @return whether this circuit has at least one switch */
++    public boolean hasSwitches() {
++        return !switches.isEmpty();
++    }
++
++    void addGate(Gate gate) {
++        gates.add(gate);
++    }
++
++    void addSwitch(Switch circuitSwitch) {
++        switches.add(circuitSwitch);
++    }
++
++    /** Toggles the command and updates every gate in this circuit. */
++    public void toggle() {
++        open = !open;
++        for (Gate gate : gates) {
++            if (open) {
++                gate.open();
++            } else {
++                gate.close();
++            }
++        }
++    }
++}
+diff --git a/src/main/java/nl/tudelft/jpacman/board/Gate.java b/src/main/java/nl/tudelft/jpacman/board/Gate.java
+new file mode 100644
+index 0000000..c8c9cf4
+--- /dev/null
++++ b/src/main/java/nl/tudelft/jpacman/board/Gate.java
+@@ -0,0 +1,83 @@
++package nl.tudelft.jpacman.board;
++
++import java.awt.Color;
++import nl.tudelft.jpacman.sprite.LabelSprite;
++import nl.tudelft.jpacman.sprite.Sprite;
++
++/** A gate whose entry permission is controlled by a circuit. */
++public class Gate extends Square {
++    private final Sprite closedSprite;
++    private final Sprite openSprite;
++    private final Sprite pendingSprite;
++    private boolean open;
++    private boolean pending;
++
++    /**
++     * Creates a gate in the closed state and registers it with its circuit.
++     *
++     * @param circuit circuit controlling this gate
++     * @param openBackground background used for an open gate
++     * @param closedBackground background used for a closed gate
++     */
++    public Gate(Circuit circuit, Sprite openBackground, Sprite closedBackground) {
++        this.openSprite = new LabelSprite(openBackground,
++            String.valueOf(circuit.getId()), Color.BLACK);
++        this.closedSprite = new LabelSprite(closedBackground,
++            String.valueOf(circuit.getId()), Color.WHITE);
++        this.pendingSprite = new LabelSprite(closedBackground,
++            circuit.getId() + "*", Color.YELLOW);
++        this.open = false;
++        this.pending = false;
++        circuit.addGate(this);
++    }
++
++    /** Opens the gate and cancels any pending closure. */
++    void open() {
++        open = true;
++        pending = false;
++    }
++
++    /**
++     * Closes an empty gate immediately or schedules closure after occupants leave.
++     */
++    void close() {
++        if (getOccupants().isEmpty()) {
++            open = false;
++            pending = false;
++        } else {
++            open = false;
++            pending = true;
++        }
++    }
++
++    /** Completes a pending closure when the last occupant leaves. */
++    void unitLeft() {
++        if (pending && getOccupants().isEmpty()) {
++            open = false;
++            pending = false;
++        }
++    }
++
++    /** @return true when the gate is fully open and accepts new entrants */
++    public boolean isOpen() {
++        return open && !pending;
++    }
++
++    /** @return true while the gate waits for its current occupants to leave */
++    public boolean isPending() {
++        return pending;
++    }
++
++    @Override
++    public boolean isAccessibleTo(Unit unit) {
++        return isOpen();
++    }
++
++    @Override
++    public Sprite getSprite() {
++        if (pending) {
++            return pendingSprite;
++        }
++        return open ? openSprite : closedSprite;
++    }
++}
+diff --git a/src/main/java/nl/tudelft/jpacman/board/Switch.java b/src/main/java/nl/tudelft/jpacman/board/Switch.java
+new file mode 100644
+index 0000000..8790398
+--- /dev/null
++++ b/src/main/java/nl/tudelft/jpacman/board/Switch.java
+@@ -0,0 +1,43 @@
++package nl.tudelft.jpacman.board;
++
++import nl.tudelft.jpacman.level.Player;
++import nl.tudelft.jpacman.sprite.Sprite;
++
++/** A permanent floor switch that toggles one circuit when entered by a live player. */
++public class Switch extends Square {
++    private final Circuit circuit;
++    private final Sprite sprite;
++
++    /**
++     * Creates a switch and registers it with its circuit.
++     *
++     * @param controller the circuit toggled by this switch
++     * @param switchSprite visual representation of the switch
++     */
++    public Switch(Circuit controller, Sprite switchSprite) {
++        this.circuit = controller;
++        this.sprite = switchSprite;
++        controller.addSwitch(this);
++    }
++
++    /**
++     * Toggles this switch's circuit for a living player.
++     *
++     * @param player the player that entered the switch
++     */
++    public void activate(Player player) {
++        if (player.isAlive()) {
++            circuit.toggle();
++        }
++    }
++
++    @Override
++    public boolean isAccessibleTo(Unit unit) {
++        return true;
++    }
++
++    @Override
++    public Sprite getSprite() {
++        return sprite;
++    }
++}
+diff --git a/src/main/java/nl/tudelft/jpacman/board/Unit.java b/src/main/java/nl/tudelft/jpacman/board/Unit.java
+index 0af7af3..66e7be9 100644
+--- a/src/main/java/nl/tudelft/jpacman/board/Unit.java
++++ b/src/main/java/nl/tudelft/jpacman/board/Unit.java
+@@ -72,12 +72,15 @@ public abstract class Unit {
+      */
+     public void occupy(Square target) {
+         assert target != null;
+-
+-        if (square != null) {
+-            square.remove(this);
++        Square previous = square;
++        if (previous != null) {
++            previous.remove(this);
+         }
+         square = target;
+         target.put(this);
++        if (previous instanceof Gate) {
++            ((Gate) previous).unitLeft();
++        }
+         assert invariant();
+     }
+ 
+@@ -85,10 +88,14 @@ public abstract class Unit {
+      * Leaves the currently occupying square, thus removing this unit from the board.
+      */
+     public void leaveSquare() {
+-        if (square != null) {
+-            square.remove(this);
++        Square previous = square;
++        if (previous != null) {
++            previous.remove(this);
+             square = null;
+         }
++        if (previous instanceof Gate) {
++            ((Gate) previous).unitLeft();
++        }
+         assert invariant();
+     }
+ 
+diff --git a/src/main/java/nl/tudelft/jpacman/level/Level.java b/src/main/java/nl/tudelft/jpacman/level/Level.java
+index 89fbf20..10cea76 100644
+--- a/src/main/java/nl/tudelft/jpacman/level/Level.java
++++ b/src/main/java/nl/tudelft/jpacman/level/Level.java
+@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
+ import nl.tudelft.jpacman.board.Board;
+ import nl.tudelft.jpacman.board.Direction;
+ import nl.tudelft.jpacman.board.Square;
++import nl.tudelft.jpacman.board.Switch;
+ import nl.tudelft.jpacman.board.Unit;
+ import nl.tudelft.jpacman.npc.Ghost;
+ 
+@@ -189,6 +190,10 @@ public class Level {
+                 for (Unit occupant : occupants) {
+                     collisions.collide(unit, occupant);
+                 }
++                if (destination != location && unit instanceof Player
++                    && ((Player) unit).isAlive() && destination instanceof Switch) {
++                    ((Switch) destination).activate((Player) unit);
++                }
+             }
+             updateObservers();
+         }
+diff --git a/src/main/java/nl/tudelft/jpacman/level/MapParser.java b/src/main/java/nl/tudelft/jpacman/level/MapParser.java
+index 90fb9e5..66ceb07 100644
+--- a/src/main/java/nl/tudelft/jpacman/level/MapParser.java
++++ b/src/main/java/nl/tudelft/jpacman/level/MapParser.java
+@@ -10,6 +10,7 @@ import java.util.List;
+ import nl.tudelft.jpacman.PacmanConfigurationException;
+ import nl.tudelft.jpacman.board.Board;
+ import nl.tudelft.jpacman.board.BoardFactory;
++import nl.tudelft.jpacman.board.Circuit;
+ import nl.tudelft.jpacman.board.Square;
+ import nl.tudelft.jpacman.npc.Ghost;
+ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+@@ -31,6 +32,9 @@ public class MapParser {
+      */
+     private final BoardFactory boardCreator;
+ 
++    /** The circuits referenced by the map currently being parsed. */
++    private Circuit[] circuits;
++
+     /**
+      * Creates a new map parser.
+      *
+@@ -54,6 +58,8 @@ public class MapParser {
+      * <li>'.' (period) a square with a pellet.
+      * <li>'P' (capital P) a starting square for players.
+      * <li>'G' (capital G) a square with a ghost.
++     * <li>'1' and '2' switches for circuits one and two.
++     * <li>'a' and 'b' gates for circuits one and two.
+      * </ul>
+      *
+      * @param map
+@@ -70,7 +76,9 @@ public class MapParser {
+         List<Ghost> ghosts = new ArrayList<>();
+         List<Square> startPositions = new ArrayList<>();
+ 
++        circuits = new Circuit[] {new Circuit(1), new Circuit(2)};
+         makeGrid(map, width, height, grid, ghosts, startPositions);
++        validateCircuits();
+ 
+         Board board = boardCreator.createBoard(grid);
+         return levelCreator.createLevel(board, ghosts, startPositions);
+@@ -129,6 +137,18 @@ public class MapParser {
+                 grid[x][y] = playerSquare;
+                 startPositions.add(playerSquare);
+                 break;
++            case 'a':
++                grid[x][y] = boardCreator.createGate(circuits[0]);
++                break;
++            case 'b':
++                grid[x][y] = boardCreator.createGate(circuits[1]);
++                break;
++            case '1':
++                grid[x][y] = boardCreator.createSwitch(circuits[0]);
++                break;
++            case '2':
++                grid[x][y] = boardCreator.createSwitch(circuits[1]);
++                break;
+             default:
+                 throw new PacmanConfigurationException("Invalid character at "
+                     + x + "," + y + ": " + c);
+@@ -143,6 +163,17 @@ public class MapParser {
+      * @param ghost the newly created ghost to be placed
+      * @return a square with the ghost on it.
+      */
++    private void validateCircuits() {
++        for (Circuit circuit : circuits) {
++            if (circuit.isUsed()
++                && (!circuit.hasGates() || !circuit.hasSwitches())) {
++                throw new PacmanConfigurationException(
++                    "Circuit " + circuit.getId()
++                        + " must contain at least one gate and one switch.");
++            }
++        }
++    }
++
+     protected Square makeGhostSquare(List<Ghost> ghosts, Ghost ghost) {
+         Square ghostSquare = boardCreator.createGround();
+         ghosts.add(ghost);
+diff --git a/src/main/java/nl/tudelft/jpacman/sprite/LabelSprite.java b/src/main/java/nl/tudelft/jpacman/sprite/LabelSprite.java
+new file mode 100644
+index 0000000..8cafc6d
+--- /dev/null
++++ b/src/main/java/nl/tudelft/jpacman/sprite/LabelSprite.java
+@@ -0,0 +1,56 @@
++package nl.tudelft.jpacman.sprite;
++
++import java.awt.Color;
++import java.awt.Font;
++import java.awt.FontMetrics;
++import java.awt.Graphics;
++
++/** Draws a short identifying label over an existing sprite. */
++public class LabelSprite implements Sprite {
++    private final Sprite background;
++    private final String label;
++    private final Color color;
++
++    /**
++     * Creates a labeled sprite.
++     *
++     * @param backgroundSprite sprite drawn below the label
++     * @param text label to draw
++     * @param labelColor label color
++     */
++    public LabelSprite(Sprite backgroundSprite, String text, Color labelColor) {
++        this.background = backgroundSprite;
++        this.label = text;
++        this.color = labelColor;
++    }
++
++    @Override
++    public void draw(Graphics graphics, int x, int y, int width, int height) {
++        background.draw(graphics, x, y, width, height);
++        Font oldFont = graphics.getFont();
++        Color oldColor = graphics.getColor();
++        graphics.setFont(oldFont.deriveFont(Font.BOLD, Math.max(9.0f, height * 0.65f)));
++        graphics.setColor(color);
++        FontMetrics metrics = graphics.getFontMetrics();
++        int labelX = x + 1;
++        int labelY = y + metrics.getAscent();
++        graphics.drawString(label, labelX, labelY);
++        graphics.setFont(oldFont);
++        graphics.setColor(oldColor);
++    }
++
++    @Override
++    public Sprite split(int x, int y, int width, int height) {
++        return new LabelSprite(background.split(x, y, width, height), label, color);
++    }
++
++    @Override
++    public int getWidth() {
++        return background.getWidth();
++    }
++
++    @Override
++    public int getHeight() {
++        return background.getHeight();
++    }
++}
+diff --git a/src/main/java/nl/tudelft/jpacman/sprite/PacManSprites.java b/src/main/java/nl/tudelft/jpacman/sprite/PacManSprites.java
+index 9b68270..ca16214 100644
+--- a/src/main/java/nl/tudelft/jpacman/sprite/PacManSprites.java
++++ b/src/main/java/nl/tudelft/jpacman/sprite/PacManSprites.java
+@@ -133,6 +133,17 @@ public class PacManSprites extends SpriteStore {
+         return loadSprite("/sprite/pellet.png");
+     }
+ 
++    /**
++     * Returns the visual used for a floor switch.
++     *
++     * @param circuit the circuit identifier displayed on the switch
++     * @return the switch sprite
++     */
++    public Sprite getSwitchSprite(int circuit) {
++        return new LabelSprite(loadSprite("/sprite/key.png"),
++            String.valueOf(circuit), java.awt.Color.WHITE);
++    }
++
+     /**
+      * Overloads the default sprite loading, ignoring the exception. This class
+      * assumes all sprites are provided, hence the exception will be thrown as a
+diff --git a/src/main/resources/feature1.txt b/src/main/resources/feature1.txt
+new file mode 100644
+index 0000000..2d85dbd
+--- /dev/null
++++ b/src/main/resources/feature1.txt
+@@ -0,0 +1,9 @@
++#################
++#P..1...a....1..#
++#.#.###.#.###.#.#
++#...2...#...1...#
++#.###.a.#.b.###.#
++#...G...#.......#
++#.#.###.###.###.#
++#...2...b...a...#
++#################
+diff --git a/src/test/java/nl/tudelft/jpacman/board/CircuitTest.java b/src/test/java/nl/tudelft/jpacman/board/CircuitTest.java
+new file mode 100644
+index 0000000..b8bbb23
+--- /dev/null
++++ b/src/test/java/nl/tudelft/jpacman/board/CircuitTest.java
+@@ -0,0 +1,135 @@
++package nl.tudelft.jpacman.board;
++
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++import java.awt.Graphics;
++import org.junit.jupiter.api.Test;
++import nl.tudelft.jpacman.sprite.Sprite;
++
++/** Unit tests for the independent circuit and pending-gate behaviour. */
++class CircuitTest {
++    private static final Sprite TEST_SPRITE = new TestSprite();
++
++    /** Circuits start closed and toggling one does not affect the other. */
++    @Test
++    void circuitsAreIndependentAndStartClosed() {
++        Circuit first = new Circuit(1);
++        Circuit second = new Circuit(2);
++        Gate firstGate = new Gate(first, TEST_SPRITE, TEST_SPRITE);
++        Gate secondGate = new Gate(second, TEST_SPRITE, TEST_SPRITE);
++        Unit unit = new TestUnit();
++
++        assertFalse(first.isOpen());
++        assertFalse(firstGate.isAccessibleTo(unit));
++        assertFalse(secondGate.isAccessibleTo(unit));
++
++        first.toggle();
++
++        assertTrue(first.isOpen());
++        assertTrue(firstGate.isAccessibleTo(unit));
++        assertFalse(second.isOpen());
++        assertFalse(secondGate.isAccessibleTo(unit));
++    }
++
++    /** Gates in one circuit receive the same command but may be pending differently. */
++    @Test
++    void gatesShareCommandsButKeepTheirOwnOccupancyState() {
++        Circuit circuit = new Circuit(1);
++        Gate emptyGate = new Gate(circuit, TEST_SPRITE, TEST_SPRITE);
++        Gate occupiedGate = new Gate(circuit, TEST_SPRITE, TEST_SPRITE);
++        Unit occupant = new TestUnit();
++        circuit.toggle();
++        occupant.occupy(occupiedGate);
++
++        circuit.toggle();
++
++        assertFalse(emptyGate.isOpen());
++        assertFalse(emptyGate.isPending());
++        assertFalse(occupiedGate.isOpen());
++        assertTrue(occupiedGate.isPending());
++    }
++
++    /** A pending gate closes only after the last of its occupants has left. */
++    @Test
++    void pendingCloseWaitsForAllOccupants() {
++        Circuit circuit = new Circuit(1);
++        Gate gate = new Gate(circuit, TEST_SPRITE, TEST_SPRITE);
++        Unit first = new TestUnit();
++        Unit second = new TestUnit();
++        Unit entrant = new TestUnit();
++        circuit.toggle();
++        first.occupy(gate);
++        second.occupy(gate);
++
++        circuit.toggle();
++
++        assertTrue(gate.isPending());
++        assertFalse(gate.isAccessibleTo(entrant));
++        first.occupy(new GroundSquare());
++        assertTrue(gate.isPending());
++        second.leaveSquare();
++        assertFalse(gate.isPending());
++        assertFalse(gate.isOpen());
++        assertFalse(gate.isAccessibleTo(entrant));
++    }
++
++    /** Opening a circuit cancels its gates' pending close state. */
++    @Test
++    void openingCancelsPendingClose() {
++        Circuit circuit = new Circuit(1);
++        Gate gate = new Gate(circuit, TEST_SPRITE, TEST_SPRITE);
++        Unit occupant = new TestUnit();
++        circuit.toggle();
++        occupant.occupy(gate);
++        circuit.toggle();
++        assertTrue(gate.isPending());
++
++        circuit.toggle();
++
++        assertFalse(gate.isPending());
++        assertTrue(gate.isOpen());
++        assertTrue(gate.getOccupants().contains(occupant));
++    }
++
++    private static final class TestUnit extends Unit {
++        @Override
++        public Sprite getSprite() {
++            return TEST_SPRITE;
++        }
++    }
++
++    private static final class GroundSquare extends Square {
++        @Override
++        public boolean isAccessibleTo(Unit unit) {
++            return true;
++        }
++
++        @Override
++        public Sprite getSprite() {
++            return TEST_SPRITE;
++        }
++    }
++
++    private static final class TestSprite implements Sprite {
++        @Override
++        public void draw(Graphics graphics, int x, int y, int width, int height) {
++            // No drawing is needed in these state tests.
++        }
++
++        @Override
++        public Sprite split(int x, int y, int width, int height) {
++            return this;
++        }
++
++        @Override
++        public int getWidth() {
++            return 16;
++        }
++
++        @Override
++        public int getHeight() {
++            return 16;
++        }
++    }
++}
+diff --git a/src/test/java/nl/tudelft/jpacman/board/SwitchTest.java b/src/test/java/nl/tudelft/jpacman/board/SwitchTest.java
+new file mode 100644
+index 0000000..a977c76
+--- /dev/null
++++ b/src/test/java/nl/tudelft/jpacman/board/SwitchTest.java
+@@ -0,0 +1,66 @@
++package nl.tudelft.jpacman.board;
++
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.when;
++
++import java.awt.Graphics;
++import org.junit.jupiter.api.Test;
++import nl.tudelft.jpacman.level.Player;
++import nl.tudelft.jpacman.sprite.Sprite;
++
++/** Unit tests for switch activation rules. */
++class SwitchTest {
++    private static final Sprite TEST_SPRITE = new TestSprite();
++
++    /** A live player toggles the switch's circuit on each activation. */
++    @Test
++    void livePlayerTogglesCircuit() {
++        Circuit circuit = new Circuit(1);
++        Switch firstSwitch = new Switch(circuit, TEST_SPRITE);
++        Switch secondSwitch = new Switch(circuit, TEST_SPRITE);
++        Player player = mock(Player.class);
++        when(player.isAlive()).thenReturn(true);
++
++        firstSwitch.activate(player);
++        assertTrue(circuit.isOpen());
++        secondSwitch.activate(player);
++        assertFalse(circuit.isOpen());
++    }
++
++    /** A dead player cannot activate a switch after a collision. */
++    @Test
++    void deadPlayerDoesNotToggleCircuit() {
++        Circuit circuit = new Circuit(1);
++        Switch floorSwitch = new Switch(circuit, TEST_SPRITE);
++        Player player = mock(Player.class);
++        when(player.isAlive()).thenReturn(false);
++
++        floorSwitch.activate(player);
++
++        assertFalse(circuit.isOpen());
++    }
++
++    private static final class TestSprite implements Sprite {
++        @Override
++        public void draw(Graphics graphics, int x, int y, int width, int height) {
++            // No drawing is needed in these state tests.
++        }
++
++        @Override
++        public Sprite split(int x, int y, int width, int height) {
++            return this;
++        }
++
++        @Override
++        public int getWidth() {
++            return 16;
++        }
++
++        @Override
++        public int getHeight() {
++            return 16;
++        }
++    }
++}
+diff --git a/src/test/java/nl/tudelft/jpacman/level/Feature1MovementTest.java b/src/test/java/nl/tudelft/jpacman/level/Feature1MovementTest.java
+new file mode 100644
+index 0000000..5d795f3
+--- /dev/null
++++ b/src/test/java/nl/tudelft/jpacman/level/Feature1MovementTest.java
+@@ -0,0 +1,119 @@
++package nl.tudelft.jpacman.level;
++
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertNotNull;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++import static org.mockito.Mockito.mock;
++
++import java.util.Arrays;
++import org.junit.jupiter.api.Test;
++import nl.tudelft.jpacman.PacmanConfigurationException;
++import nl.tudelft.jpacman.board.BoardFactory;
++import nl.tudelft.jpacman.board.Direction;
++import nl.tudelft.jpacman.board.Gate;
++import nl.tudelft.jpacman.npc.Ghost;
++import nl.tudelft.jpacman.npc.ghost.GhostFactory;
++import nl.tudelft.jpacman.points.PointCalculator;
++import nl.tudelft.jpacman.sprite.PacManSprites;
++
++/** Integration tests for the Feature 1 map format and movement behaviour. */
++class Feature1MovementTest {
++    /** A switch toggles on entry, not while the player stays on it. */
++    @Test
++    void switchTogglesOnlyWhenEntered() {
++        PacManSprites sprites = new PacManSprites();
++        Level level = createParser(sprites).parseMap(Arrays.asList(
++            "#######", "#P1a..#", "#######"));
++        Player player = new PlayerFactory(sprites).createPacMan();
++        level.registerPlayer(player);
++        Gate gate = (Gate) level.getBoard().squareAt(3, 1);
++        level.start();
++        try {
++            level.move(player, Direction.EAST);
++            assertTrue(gate.isOpen());
++
++            level.move(player, Direction.NORTH);
++            assertTrue(gate.isOpen());
++
++            level.move(player, Direction.EAST);
++            assertTrue(gate.isOpen());
++            level.move(player, Direction.WEST);
++            assertFalse(gate.isOpen());
++        } finally {
++            level.stop();
++        }
++    }
++
++    /** A ghost may occupy a switch without activating its circuit. */
++    @Test
++    void ghostDoesNotActivateSwitch() {
++        PacManSprites sprites = new PacManSprites();
++        Level level = createParser(sprites).parseMap(Arrays.asList(
++            "#######", "#P1a..#", "#######"));
++        Ghost ghost = new GhostFactory(sprites).createBlinky();
++        ghost.occupy(level.getBoard().squareAt(1, 1));
++        Gate gate = (Gate) level.getBoard().squareAt(3, 1);
++        level.start();
++        try {
++            level.move(ghost, Direction.EAST);
++            assertFalse(gate.isOpen());
++        } finally {
++            level.stop();
++        }
++    }
++
++    /** Collision with a ghost on the switch prevents activation. */
++    @Test
++    void collisionOnSwitchPreventsActivation() {
++        PacManSprites sprites = new PacManSprites();
++        Level level = createParser(sprites).parseMap(Arrays.asList(
++            "#######", "#P1a..#", "#######"));
++        Ghost ghost = new GhostFactory(sprites).createBlinky();
++        ghost.occupy(level.getBoard().squareAt(2, 1));
++        Player player = new PlayerFactory(sprites).createPacMan();
++        level.registerPlayer(player);
++        Gate gate = (Gate) level.getBoard().squareAt(3, 1);
++        level.start();
++        try {
++            level.move(player, Direction.EAST);
++            assertFalse(player.isAlive());
++            assertFalse(gate.isOpen());
++        } finally {
++            level.stop();
++        }
++    }
++
++    /** A map with no Feature 1 symbols remains valid. */
++    @Test
++    void oldMapWithoutCircuitsStillParses() {
++        PacManSprites sprites = new PacManSprites();
++        Level level = createParser(sprites).parseMap(Arrays.asList(
++            "#####", "#P..#", "#####"));
++        assertNotNull(level);
++    }
++
++    /** A circuit with only a switch is rejected with a configuration error. */
++    @Test
++    void incompleteCircuitIsRejected() {
++        PacManSprites sprites = new PacManSprites();
++        MapParser parser = createParser(sprites);
++        assertThrows(PacmanConfigurationException.class,
++            () -> parser.parseMap(Arrays.asList("#####", "#P1.#", "#####")));
++    }
++
++    /** Unknown map characters retain the parser's explicit error behaviour. */
++    @Test
++    void unknownMapSymbolIsRejected() {
++        PacManSprites sprites = new PacManSprites();
++        MapParser parser = createParser(sprites);
++        assertThrows(PacmanConfigurationException.class,
++            () -> parser.parseMap(Arrays.asList("#####", "#PX.#", "#####")));
++    }
++
++    private MapParser createParser(PacManSprites sprites) {
++        LevelFactory levels = new LevelFactory(sprites,
++            new GhostFactory(sprites), mock(PointCalculator.class));
++        return new MapParser(levels, new BoardFactory(sprites));
++    }
++}
