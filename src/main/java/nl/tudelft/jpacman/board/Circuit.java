@@ -74,7 +74,7 @@ public class Circuit {
 
     public void pulse() {
     	if (segundos == 0) this.toggle();
-	this.segundos += 5000;
+	this.segundos += 5;
 	ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
 	service.schedule(new PulseRenew(service, this), 5, TimeUnit.SECONDS);
     }
@@ -85,10 +85,8 @@ public class Circuit {
 	PulseRenew(ScheduledExecutorService service, Circuit circuit)
 	{
 		this.service = service;
-		circuit.segundos -= 5000;
+		circuit.segundos -= 5;
 		if (circuit.segundos == 0) circuit.toggle();
-		else if (circuit.segundos < 0) circuit.segundos = 0;
-		else service.schedule(new PulseRenew(service, circuit), 5, TimeUnit.SECONDS);
 	}
     }
 }
