@@ -12,6 +12,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import nl.tudelft.jpacman.board.Board;
+import nl.tudelft.jpacman.board.Circuit;
 import nl.tudelft.jpacman.board.Direction;
 import nl.tudelft.jpacman.board.Square;
 import nl.tudelft.jpacman.board.Switch;
@@ -48,6 +49,11 @@ public class Level {
      * The NPCs of this level and, if they are running, their schedules.
      */
     private final Map<Ghost, ScheduledExecutorService> npcs;
+
+    /**
+     * The Circuits of this level and their respective pulse schedules.
+     */
+    private final Map<Circuit, ScheduledExecutorService> pulses;
 
     /**
      * <code>true</code> iff this level is currently in progress, i.e. players
@@ -91,11 +97,14 @@ public class Level {
      *            The squares on which players start on this board.
      * @param collisionMap
      *            The collection of collisions that should be handled.
+     * @param circuits
+     *            The collection of circuits, for pulse scheduling.
      */
-    public Level(Board board, List<Ghost> ghosts, List<Square> startPositions,
+    public Level(Board board, List<Ghost> ghosts, List<Circuit> circuits, List<Square> startPositions,
                  CollisionMap collisionMap) {
         assert board != null;
         assert ghosts != null;
+	assert circuits != null;
         assert startPositions != null;
 
         this.board = board;
@@ -104,6 +113,10 @@ public class Level {
         for (Ghost ghost : ghosts) {
             npcs.put(ghost, null);
         }
+	this.pulses = new HashMap<>();
+	for (Circuit circ : circuits) {
+	    pulses.put(circ,null);
+	}
         this.startSquares = startPositions;
         this.startSquareIndex = 0;
         this.players = new ArrayList<>();
@@ -214,6 +227,7 @@ public class Level {
                 return;
             }
             startNPCs();
+	    startPulses();
             inProgress = true;
             updateObservers();
         }
@@ -229,6 +243,7 @@ public class Level {
                 return;
             }
             stopNPCs();
+	    stopPulses();
             inProgress = false;
         }
     }
@@ -248,11 +263,36 @@ public class Level {
     }
 
     /**
+     * Starts any and every pulse polling.
+     */
+    private void startPulses() {
+        for (final Circuit circ : pulses.KeySet()) {
+	    ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+
+	    service.schedule(new PulseTask(service, circ),
+	        250, TimeUnit.MILLISECONDS);
+
+	    pulses.put(circ, service);
+	}
+    }
+
+    /**
      * Stops all NPC movement scheduling and interrupts any movements being
      * executed.
      */
     private void stopNPCs() {
         for (Entry<Ghost, ScheduledExecutorService> entry : npcs.entrySet()) {
+            ScheduledExecutorService schedule = entry.getValue();
+            assert schedule != null;
+            schedule.shutdownNow();
+        }
+    }
+
+    /**
+     * Stops any and every pulse polling.
+     */
+    private void stopPulses() {
+        for (Entry<Circuit, ScheduledExecutorService> entry : pulses.entrySet()) {
             ScheduledExecutorService schedule = entry.getValue();
             assert schedule != null;
             schedule.shutdownNow();
@@ -362,6 +402,48 @@ public class Level {
             service.schedule(this, interval, TimeUnit.MILLISECONDS);
         }
     }
+
+    /**
+     * A task that pulses a circuit regularly.
+     *
+     * @author O incrivel homem toupeira, que aguenta funça fedaputa, filhinho embustero de otoridade e um bando de imbecil em um país de bosta
+     */
+    private final class PulseTask implements Runnable {
+
+        /**
+         * The service executing the task.
+         */
+        private final ScheduledExecutorService service;
+
+        /**
+         * The circuit to pulse.
+         */
+        private final Circuit circ;
+
+        /**
+         * Creates a new task.
+         *
+         * @param service
+         *            The service that executes the task.
+         * @param npc
+         *            The NPC to move.
+         */
+        PulseTask(ScheduledExecutorService service, Circuit circ) {
+            this.service = service;
+            this.circ = circ;
+        }
+
+        @Override
+        public void run() {
+	    circ.msegundos -= 250;
+            if (circ.msegundos == 0) {
+	        circ.toggle();
+            }
+	    else if (circ.msegundos < 0) circ.msegundos = 0;
+	    else service.schedule(this, 250, TimeUnit.MILLISECONDS);
+        }
+    }
+
 
     /**
      * An observer that will be notified when the level is won or lost.

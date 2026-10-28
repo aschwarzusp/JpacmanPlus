@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import nl.tudelft.jpacman.board.Board;
+import nl.tudelft.jpacman.board.Circuit;
 import nl.tudelft.jpacman.board.Direction;
 import nl.tudelft.jpacman.board.Square;
 import nl.tudelft.jpacman.npc.Ghost;
@@ -80,14 +81,16 @@ public class LevelFactory {
      *            A list of all ghosts on the board.
      * @param startPositions
      *            A list of squares from which players may start the game.
+     * @param circuits
+     *            A list of all circuits on the board.
      * @return A new level for the board.
      */
-    public Level createLevel(Board board, List<Ghost> ghosts, List<Square> startPositions) {
+    public Level createLevel(Board board, List<Ghost> ghosts, List<Circuit> circuits, List<Square> startPositions) {
 
         // We'll adopt the simple collision map for now.
         CollisionMap collisionMap = new PlayerCollisions(pointCalculator);
 
-        return new Level(board, ghosts, startPositions, collisionMap);
+        return new Level(board, ghosts, circuits, startPositions, collisionMap);
     }
 
     /**

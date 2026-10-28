@@ -3,13 +3,13 @@ package nl.tudelft.jpacman.board;
 import nl.tudelft.jpacman.level.Player;
 import nl.tudelft.jpacman.sprite.Sprite;
 
-/** A permanent floor switch that toggles one circuit when entered by a live player. */
+/** A temporary pulse that toggles one circuit when entered by a live player. */
 public class Pulse extends Square {
     private final Circuit circuit;
     private final Sprite sprite;
 
     /**
-     * Creates a switch and registers it with its circuit.
+     * Creates a pulse and registers it with its circuit.
      *
      * @param controller the circuit toggled by this switch
      * @param switchSprite visual representation of the switch
@@ -21,7 +21,7 @@ public class Pulse extends Square {
     }
 
     /**
-     * Toggles this switch's circuit for a living player.
+     * Toggles this pulse's circuit for a living player.
      *
      * @param player the player that entered the switch
      */

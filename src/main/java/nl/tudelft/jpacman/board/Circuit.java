@@ -57,6 +57,10 @@ public class Circuit {
         switches.add(circuitSwitch);
     }
 
+    void addPulse(Pulse circuitPulse) {
+        pulses.add(circuitPulse);
+    }
+
     /** Toggles the command and updates every gate in this circuit. */
     public void toggle() {
         open = !open;
