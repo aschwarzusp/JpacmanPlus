@@ -1,69 +1,46 @@
 package nl.tudelft.jpacman.board;
 
-import java.util.ArrayList;
-import java.util.List;
+import nl.tudelft.jpacman.level.Player;
+import nl.tudelft.jpacman.sprite.Sprite;
 
-/**
- * Controls the gates belonging to one independent switch pulse.
- */
-public class Pulse {
-    private final int id;
-    private final List<Gate> gates = new ArrayList<>();
-    private final List<Switch> switches = new ArrayList<>();
-    private boolean open;
+/** A permanent floor switch that toggles one circuit when entered by a live player. */
+public class Pulse extends Square {
+    private final Circuit circuit;
+    private final Sprite sprite;
 
     /**
-     * Creates a new pulse whose gates start closed.
+     * Creates a switch and registers it with its circuit.
      *
-     * @param pulseId identifier used by map symbols and visual labels
+     * @param controller the circuit toggled by this switch
+     * @param switchSprite visual representation of the switch
      */
-    public Pulse(int pulseId) {
-        this.id = pulseId;
-        this.open = false;
+    public Pulse(Circuit controller, Sprite switchSprite) {
+        this.circuit = controller;
+        this.sprite = switchSprite;
+        controller.addPulse(this);
     }
 
-    /** @return the pulse identifier */
-    public int getId() {
-        return id;
-    }
-
-    /** @return whether the latest pulse command is open */
-    public boolean isOpen() {
-        return open;
-    }
-
-    /** @return whether this pulse occurs in the current map */
-    public boolean isUsed() {
-        return !gates.isEmpty() || !switches.isEmpty();
-    }
-
-    /** @return whether this pulse has at least one gate */
-    public boolean hasGates() {
-        return !gates.isEmpty();
-    }
-
-    /** @return whether this pulse has at least one switch */
-    public boolean hasSwitches() {
-        return !switches.isEmpty();
-    }
-
-    void addGate(Gate gate) {
-        gates.add(gate);
-    }
-
-    void addSwitch(Switch pulseSwitch) {
-        switches.add(pulseSwitch);
-    }
-
-    /** Toggles the command and updates every gate in this pulse. */
-    public void toggle() {
-        open = !open;
-        for (Gate gate : gates) {
-            if (open) {
-                gate.open();
-            } else {
-                gate.close();
-            }
+    /**
+     * Toggles this switch's circuit for a living player.
+     *
+     * @param player the player that entered the switch
+     */
+    public void activate(Player player) {
+        if (player.isAlive()) {
+            if (circuit.msegundos == 0 ) {
+	    	circuit.toggle();
+	    }
+	    circuit.msegundos += 5000;
         }
+    }
+
+    @Override
+    public boolean isAccessibleTo(Unit unit) {
+        return true;
+    }
+
+    @Override
+    public Sprite getSprite() {
+        return sprite;
     }
 }

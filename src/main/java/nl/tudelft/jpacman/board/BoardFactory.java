@@ -97,6 +97,11 @@ public class BoardFactory {
             sprites.getSwitchSprite(circuitController.getId()));
     }
 
+    public Square createPulse(Circuit circuitController) {
+        return new Pulse(circuitController,
+	    sprites.getPulseSprite(circuitController.getId()));
+    }
+
     /**
      * A wall is a square that is inaccessible to anyone.
      *

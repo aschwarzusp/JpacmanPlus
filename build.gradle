@@ -101,8 +101,7 @@ task runFeature1(type: JavaExec) {
     main = 'nl.tudelft.jpacman.Feature1Launcher'
 }
 
-task runFeature2(type: JavaExec)
-{
+task runFeature2(type: JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 	main = 'nl.tudelft.jpacman.Feature2Launcher'
 }

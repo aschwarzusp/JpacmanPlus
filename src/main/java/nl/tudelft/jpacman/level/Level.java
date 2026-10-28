@@ -15,6 +15,7 @@ import nl.tudelft.jpacman.board.Board;
 import nl.tudelft.jpacman.board.Direction;
 import nl.tudelft.jpacman.board.Square;
 import nl.tudelft.jpacman.board.Switch;
+import nl.tudelft.jpacman.board.Pulse;
 import nl.tudelft.jpacman.board.Unit;
 import nl.tudelft.jpacman.npc.Ghost;
 
@@ -193,6 +194,10 @@ public class Level {
                 if (destination != location && unit instanceof Player
                     && ((Player) unit).isAlive() && destination instanceof Switch) {
                     ((Switch) destination).activate((Player) unit);
+                }
+                if (destination != location && unit instanceof Player
+                    && ((Player) unit).isAlive() && destination instanceof Pulse) {
+                    ((Pulse) destination).activate((Player) unit);
                 }
             }
             updateObservers();

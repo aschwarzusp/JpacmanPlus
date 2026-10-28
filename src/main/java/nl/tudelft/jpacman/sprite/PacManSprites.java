@@ -144,6 +144,11 @@ public class PacManSprites extends SpriteStore {
             String.valueOf(circuit), java.awt.Color.WHITE);
     }
 
+    public Sprite getPulseSprite(int circuit) {
+        return new LabelSprite(loadSprite("/sprite/bell.png"),
+            String.valueOf(circuit), java.awt.Color.CYAN);
+    }
+
     /**
      * Overloads the default sprite loading, ignoring the exception. This class
      * assumes all sprites are provided, hence the exception will be thrown as a

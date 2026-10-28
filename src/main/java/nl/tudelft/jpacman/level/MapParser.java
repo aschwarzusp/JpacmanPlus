@@ -149,6 +149,12 @@ public class MapParser {
             case '2':
                 grid[x][y] = boardCreator.createSwitch(circuits[1]);
                 break;
+	    case 'A':
+	        grid[x][y] = boardCreator.createPulse(circuits[0]);
+		break;
+	    case 'B':
+	        grid[x][y] = boardCreator.createPulse(circuits[1]);
+		break;
             default:
                 throw new PacmanConfigurationException("Invalid character at "
                     + x + "," + y + ": " + c);

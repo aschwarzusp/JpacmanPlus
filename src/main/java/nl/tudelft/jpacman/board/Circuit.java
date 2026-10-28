@@ -2,9 +2,6 @@ package nl.tudelft.jpacman.board;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Controls the gates belonging to one independent switch circuit.
@@ -15,7 +12,7 @@ public class Circuit {
     private final List<Switch> switches = new ArrayList<>();
     private final List<Pulse> pulses = new ArrayList<>();
     private boolean open;
-    public int segundos = 0;
+    public int msegundos = 0;
 
     /**
      * Creates a new circuit whose gates start closed.
@@ -70,23 +67,5 @@ public class Circuit {
                 gate.close();
             }
         }
-    }
-
-    public void pulse() {
-    	if (segundos == 0) this.toggle();
-	this.segundos += 5;
-	ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-	service.schedule(new PulseRenew(service, this), 5, TimeUnit.SECONDS);
-    }
-
-    private final class PulseRenew
-    {
-    	private final ScheduledExecutorService service;
-	PulseRenew(ScheduledExecutorService service, Circuit circuit)
-	{
-		this.service = service;
-		circuit.segundos -= 5;
-		if (circuit.segundos == 0) circuit.toggle();
-	}
     }
 }
