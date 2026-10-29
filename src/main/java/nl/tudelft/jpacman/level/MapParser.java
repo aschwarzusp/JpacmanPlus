@@ -33,7 +33,7 @@ public class MapParser {
     private final BoardFactory boardCreator;
 
     /** The circuits referenced by the map currently being parsed. */
-    private Circuit[] circuits;
+    //private Circuit[] circuits;
 
     /**
      * Creates a new map parser.
@@ -76,20 +76,24 @@ public class MapParser {
         List<Ghost> ghosts = new ArrayList<>();
         List<Square> startPositions = new ArrayList<>();
 
-        circuits = new Circuit[] {new Circuit(1), new Circuit(2)};
-        makeGrid(map, width, height, grid, ghosts, startPositions);
-        validateCircuits();
+        //circuits = new Circuit[] {new Circuit(1), new Circuit(2)};
+	List<Circuit> circuits = new ArrayList<>();
+	circuits.add(new Circuit(1));
+	circuits.add(new Circuit(2));
+
+        makeGrid(map, width, height, grid, ghosts, circuits, startPositions);
+        validateCircuits(circuits);
 
         Board board = boardCreator.createBoard(grid);
-        return levelCreator.createLevel(board, ghosts, startPositions);
+        return levelCreator.createLevel(board, ghosts, circuits, startPositions);
     }
 
     private void makeGrid(char[][] map, int width, int height,
-                          Square[][] grid, List<Ghost> ghosts, List<Square> startPositions) {
+                          Square[][] grid, List<Ghost> ghosts, List<Circuit> circuits, List<Square> startPositions) {
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 char c = map[x][y];
-                addSquare(grid, ghosts, startPositions, x, y, c);
+                addSquare(grid, ghosts, circuits, startPositions, x, y, c);
             }
         }
     }
@@ -114,7 +118,7 @@ public class MapParser {
      * @param c
      *            Character describing the square type.
      */
-    protected void addSquare(Square[][] grid, List<Ghost> ghosts,
+    protected void addSquare(Square[][] grid, List<Ghost> ghosts, List<Circuit> circuits,
                              List<Square> startPositions, int x, int y, char c) {
         switch (c) {
             case ' ':
@@ -138,22 +142,22 @@ public class MapParser {
                 startPositions.add(playerSquare);
                 break;
             case 'a':
-                grid[x][y] = boardCreator.createGate(circuits[0]);
+                grid[x][y] = boardCreator.createGate(circuits.get(0));
                 break;
             case 'b':
-                grid[x][y] = boardCreator.createGate(circuits[1]);
+                grid[x][y] = boardCreator.createGate(circuits.get(1));
                 break;
             case '1':
-                grid[x][y] = boardCreator.createSwitch(circuits[0]);
+                grid[x][y] = boardCreator.createSwitch(circuits.get(0));
                 break;
             case '2':
-                grid[x][y] = boardCreator.createSwitch(circuits[1]);
+                grid[x][y] = boardCreator.createSwitch(circuits.get(1));
                 break;
 	    case 'A':
-	        grid[x][y] = boardCreator.createPulse(circuits[0]);
+	        grid[x][y] = boardCreator.createPulse(circuits.get(0));
 		break;
 	    case 'B':
-	        grid[x][y] = boardCreator.createPulse(circuits[1]);
+	        grid[x][y] = boardCreator.createPulse(circuits.get(1));
 		break;
             default:
                 throw new PacmanConfigurationException("Invalid character at "
@@ -169,7 +173,7 @@ public class MapParser {
      * @param ghost the newly created ghost to be placed
      * @return a square with the ghost on it.
      */
-    private void validateCircuits() {
+    private void validateCircuits(List<Circuit> circuits) {
         for (Circuit circuit : circuits) {
             if (circuit.isUsed()
                 && (!circuit.hasGates() || !circuit.hasSwitches())) {

@@ -266,7 +266,7 @@ public class Level {
      * Starts any and every pulse polling.
      */
     private void startPulses() {
-        for (final Circuit circ : pulses.KeySet()) {
+        for (final Circuit circ : pulses.keySet()) {
 	    ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
 
 	    service.schedule(new PulseTask(service, circ),
@@ -440,7 +440,7 @@ public class Level {
 	        circ.toggle();
             }
 	    else if (circ.msegundos < 0) circ.msegundos = 0;
-	    else service.schedule(this, 250, TimeUnit.MILLISECONDS);
+	    service.schedule(this, 250, TimeUnit.MILLISECONDS);
         }
     }
 
